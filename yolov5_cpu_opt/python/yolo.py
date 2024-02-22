@@ -9,7 +9,7 @@
 
 
 import sophon.sail as sail
-import numpy as np
+
 import threading
 import time
 import os
@@ -249,11 +249,11 @@ class MultiDecoderThread(object):
                 width_list.append(ost_images[index].width())
                 height_list.append(ost_images[index].height())
 
+            dete_thresholds = [1] * len(channel_list)
+            nms_thresholds = [1] * len(channel_list)
 
-            dete_thresholds = np.ones(len(channel_list),dtype=np.float32)
-            nms_thresholds = np.ones(len(channel_list),dtype=np.float32)
-            dete_thresholds = dete_threshold*dete_thresholds
-            nms_thresholds = nms_threshold*nms_thresholds
+            dete_thresholds = [dete_threshold * threshold for threshold in dete_thresholds]
+            nms_thresholds = [nms_threshold * threshold for threshold in nms_thresholds]
 
             if self.draw_images:
                 for index, channel in enumerate(channel_list):
