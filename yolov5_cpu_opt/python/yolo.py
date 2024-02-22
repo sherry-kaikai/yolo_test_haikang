@@ -416,8 +416,6 @@ if __name__ == '__main__':
     
     decode_yolo_processes = []
     for dev_id in args.dev_id_list:
-        print("111")
-        print(dev_id)
         dev_id = int(dev_id)
         decode_yolo_processes += [Process(target=process_demo,args=(args.draw_images,args.stress_test,dev_id, \
                                                                max_que_size, input_type, input_, args.yolo_bmodel,args.batch_size, \
@@ -433,6 +431,6 @@ if __name__ == '__main__':
         logging.debug('DONE decode and yolo process')
 
     total_time = time.time() - start_time
-    logging.info('video nums{}, process is {},total time is {},loops for one process is {},total fps is {}'.format(args.video_nums,\
-        process_nums,total_time,loop_count,(loop_count*process_nums)/total_time))
+    logging.info('TPUIDs{} video nums{}, process is {},total time is {},loops for one process is {},total fps is {}'.format(args.dev_id_list,args.video_nums,\
+        process_nums,total_time,loop_count,(len(args.dev_id_list)*loop_count*process_nums)/total_time))
 
