@@ -174,14 +174,13 @@ class MultiDecoderThread(object):
                 while(PreProcessAndInference.PushImage(self.process_id,image_index, bmimg) != 0):
                     print("Porcess[{}]:[{}/{}]PreProcessAndInference Thread Full, sleep: 10ms!".format(
                         self.process_id,image_index,len(image_name_list)))
-                    time.sleep(0.01)
+                    # time.sleep(0.01)
             using_time = time.time()-time_start
             logging.info("img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(
                 using_time,using_time/len(image_name_list)*1000))
-        
-            self.flag_lock.acquire()
-            self.exit_flag = True
-            self.flag_lock.release()
+            # self.flag_lock.acquire()
+            # self.exit_flag = True
+            # self.flag_lock.release()
 
         elif self.stress_test:
             while True:
@@ -237,25 +236,25 @@ class MultiDecoderThread(object):
             dete_threshold (float): _description_
             nms_threshold (float): _description_
         """
-        while (True):
+        while True:
             if self.get_exit_flag():
+                print(self.get_exit_flag())
                 break
-            # if post_quque.empty():
-            #     time.sleep(0.01)
-            #     continue
+            print(self.get_exit_flag())
             output_tensor_map, ost_images, channel_list ,imageidx_list, padding_atrr = self.engine_image_pre_process.GetBatchData(True)
             width_list = []
             height_list= []
             for index, channel in enumerate(channel_list):
                 width_list.append(ost_images[index].width())
                 height_list.append(ost_images[index].height())
-            # output_tensor_map, channels ,imageidxs, ost_ws, ost_hs, padding_atrrs = post_quque.get(True)
+
 
             dete_thresholds = np.ones(len(channel_list),dtype=np.float32)
             nms_thresholds = np.ones(len(channel_list),dtype=np.float32)
             dete_thresholds = dete_threshold*dete_thresholds
             nms_thresholds = nms_threshold*nms_thresholds
-            if self.draw_images == True:
+
+            if self.draw_images:
                 for index, channel in enumerate(channel_list):
                     while img_queue.full():
                         time.sleep(0.01)
@@ -263,19 +262,28 @@ class MultiDecoderThread(object):
                             break
                         continue 
                     img_queue.put({(channel,imageidx_list[index]):ost_images[index]}) 
-            while True:
-                if self.get_exit_flag():
-                    break
-                ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
 
-                if ret == 0:
-                    print("push data success")
-                    break
-                else:
-                    print("push_data failed, ret: {}".format(ret))
-                    time.sleep(0.01)
-                break
-        print("post_process thread exit!")
+            # while True:
+            #     # if self.get_exit_flag():
+            #     #     break
+            #     ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
+
+            #     if ret == 0:
+            #         print("push data success")
+            #         break
+            #     else:
+            #         print("push_data failed, ret: {}".format(ret))
+            #         time.sleep(0.01)
+
+            ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
+            if ret == 0:
+                pass
+                # print("push data success")
+            else:
+                logging.error("push_data failed, ret: {}".format(ret))
+            # time.sleep(0.01)
+
+        logging.info("post_process thread exit!")
     
     def save_res_and_draw(self, img_queue:queue.Queue):
         """从self.yolov5_post_async得到yolov5后处理的一组数据输出, 并将其在原图上crop出小图, 
@@ -288,14 +296,11 @@ class MultiDecoderThread(object):
         start_time = time.time()
         yolo_res_list = []
         draw_flag = False
-        while (True):
-            if self.get_exit_flag():
-                break
-            if img_queue.empty():
-                time.sleep(0.01)
-                continue
+        logging.info("porcess {} save_res_and_draw start".format(self.process_id))
+        while True:
+            # if self.get_exit_flag():
+            #     break
 
-            
             objs, channel, image_idx = self.yolov5_post_async.get_result_npy() 
             # save result
             res_dict = dict()
@@ -309,7 +314,7 @@ class MultiDecoderThread(object):
                 bbox_dict['score'] = float(round(score,5))
                 res_dict['bboxes'].append(bbox_dict)
             self.results_list.append(res_dict)
-
+            
             if self.draw_images == True:
                 ocv_image = img_queue.get(True) 
                 print("save_res_and_draw: yolo post id and ocv id is ",(channel,image_idx),ocv_image.keys()) 
@@ -321,9 +326,6 @@ class MultiDecoderThread(object):
                         
                         logging.debug("save_res_and_draw:Process {},channel_idx is {} image_idx is {},len(objs) is{}".format(self.process_id,channel, image_idx, len(objs)))
                         logging.debug("save_res_and_draw:Process %d,YOLO postprocess DONE! objs:tuple[left, top, right, bottom, class_id, score] :%s",self.process_id,obj)
-
-                        if((x2-x1) <=16 or (y2 - y1) <= 16):
-                            pass
 
                         # draw images
                         if self.draw_images:
@@ -343,8 +345,9 @@ class MultiDecoderThread(object):
                 else:
                     logging.error("save_res_and_draw: yolo post result idx, is not equal to origin images idx:")
                     logging.error((channel,image_idx) ,list(ocv_image.keys())[0])
-
-            if self.loop_count <=  image_idx: 
+            
+            print(image_idx,self.loop_count)
+            if self.loop_count - 1 <=  image_idx: 
                 logging.info("LOOPS DONE")
                 end_time = time.time()
                 time_use = (end_time-start_time)*1000
@@ -354,7 +357,7 @@ class MultiDecoderThread(object):
                 print("Total time use: {} ms".format(time_use))
                 print("Avg time use: {} ms".format(avg_time))
                 print("Process {}: {} FPS".format(self.process_id, 1000/avg_time))
-                print("Result thread exit!")
+                print("save_res_and_draw thread exit!")
 
                 logging.info("Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
                 print("Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
@@ -368,12 +371,11 @@ class MultiDecoderThread(object):
                     self.loop_count += self.loop_count
                     self.restart_multidecoder()
                     pass
-
+        print(self.get_exit_flag())
         with open('process{}_results.json'.format(self.process_id), 'w') as jf:
             json.dump(self.results_list, jf, indent=4, ensure_ascii=False)
 
-        print("Result thread exit!")
-        print("save_res_and_draw thread exit!")
+
 
         
 def process_demo(draw_images,stress_test,tpu_id, max_que_size, input_type, input_, yolo_bmodel,batch_size,loop_count, process_id,dete_threshold,nms_threshold):
@@ -415,7 +417,8 @@ if __name__ == '__main__':
     if os.path.isdir(args.input): 
         input_ = get_imagenames(args.input)
         input_type = "img"
-        process_nums = 1
+        process_nums = int(args.video_nums/args.batch_size)
+        loop_count = int(len(input_))
     else:
         process_nums = int(args.video_nums/args.batch_size)
         input_ = [args.input for _ in range(int(args.video_nums/process_nums))] # 初始化多路本地视频流
