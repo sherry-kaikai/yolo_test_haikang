@@ -184,6 +184,7 @@ class MultiDecoderThread(object):
 
         elif self.stress_test:
             while True:
+                time_start = time.time()
                 for image_index, image_name in enumerate(image_name_list):
                     # print(image_name)
                     decoder = sail.Decoder(image_name,True,self.tpu_id)
@@ -194,9 +195,9 @@ class MultiDecoderThread(object):
                             self.process_id,image_index,len(image_name_list)))
                         time.sleep(0.01)
                 using_time = time.time()-time_start
-                logging.INFO("img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(
+                logging.info("img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(
                     using_time,using_time/len(image_name_list)*1000))
-                logging.INFO("restart")
+                logging.info("restart")
 
     
     def decoder_and_pushdata(self, channel_list:list, multi_decoder:sail.MultiDecoder, PreProcessAndInference:sail.EngineImagePreProcess):
@@ -236,11 +237,11 @@ class MultiDecoderThread(object):
             dete_threshold (float): _description_
             nms_threshold (float): _description_
         """
+        start_time = time.time()
         while True:
             if self.get_exit_flag():
                 print(self.get_exit_flag())
                 break
-            print(self.get_exit_flag())
             output_tensor_map, ost_images, channel_list ,imageidx_list, padding_atrr = self.engine_image_pre_process.GetBatchData(True)
             width_list = []
             height_list= []
@@ -263,25 +264,13 @@ class MultiDecoderThread(object):
                         continue 
                     img_queue.put({(channel,imageidx_list[index]):ost_images[index]}) 
 
-            # while True:
-            #     # if self.get_exit_flag():
-            #     #     break
-            #     ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
-
-            #     if ret == 0:
-            #         print("push data success")
-            #         break
-            #     else:
-            #         print("push_data failed, ret: {}".format(ret))
-            #         time.sleep(0.01)
-
             ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
             if ret == 0:
-                pass
-                # print("push data success")
+                logging.debug("yolov5_post_async.push_data ,time use:{:.2f}s".format(time.time()-start_time))
+
             else:
                 logging.error("push_data failed, ret: {}".format(ret))
-            # time.sleep(0.01)
+            
 
         logging.info("post_process thread exit!")
     
@@ -296,25 +285,25 @@ class MultiDecoderThread(object):
         start_time = time.time()
         yolo_res_list = []
         draw_flag = False
+        total_img = 0
         logging.info("porcess {} save_res_and_draw start".format(self.process_id))
         while True:
-            # if self.get_exit_flag():
-            #     break
-
             objs, channel, image_idx = self.yolov5_post_async.get_result_npy() 
             # save result
-            res_dict = dict()
-            res_dict['image_name'] = self.image_name_list[image_idx].split('/')[-1]
-            res_dict['bboxes'] = []
-            for idx in range(len(objs)):
-                bbox_dict = dict()
-                x1, y1, x2, y2, category_id, score = objs[idx]
-                bbox_dict['bbox'] = [float(round(x1, 3)), float(round(y1, 3)), float(round(x2 - x1,3)), float(round(y2 -y1, 3))]
-                bbox_dict['category_id'] = int(category_id)
-                bbox_dict['score'] = float(round(score,5))
-                res_dict['bboxes'].append(bbox_dict)
-            self.results_list.append(res_dict)
-            
+            if self.input_type == "img":
+                res_dict = dict()
+                res_dict['image_name'] = self.image_name_list[image_idx].split('/')[-1]
+                res_dict['bboxes'] = []
+                for idx in range(len(objs)):
+                    bbox_dict = dict()
+                    x1, y1, x2, y2, category_id, score = objs[idx]
+                    bbox_dict['bbox'] = [float(round(x1, 3)), float(round(y1, 3)), float(round(x2 - x1,3)), float(round(y2 -y1, 3))]
+                    bbox_dict['category_id'] = int(category_id)
+                    bbox_dict['score'] = float(round(score,5))
+                    res_dict['bboxes'].append(bbox_dict)
+                self.results_list.append(res_dict)
+            else:
+                pass
             if self.draw_images == True:
                 ocv_image = img_queue.get(True) 
                 print("save_res_and_draw: yolo post id and ocv id is ",(channel,image_idx),ocv_image.keys()) 
@@ -346,12 +335,13 @@ class MultiDecoderThread(object):
                     logging.error("save_res_and_draw: yolo post result idx, is not equal to origin images idx:")
                     logging.error((channel,image_idx) ,list(ocv_image.keys())[0])
             
-            print(image_idx,self.loop_count)
+            print(self.loop_count,image_idx)
             if self.loop_count - 1 <=  image_idx: 
+                total_img += image_idx
                 logging.info("LOOPS DONE")
                 end_time = time.time()
                 time_use = (end_time-start_time)*1000
-                avg_time = time_use/image_idx
+                avg_time = time_use/total_img
 
                 print("Process {}:Total images: {} ms".format(self.process_id, self.loop_count))
                 print("Total time use: {} ms".format(time_use))
@@ -368,10 +358,10 @@ class MultiDecoderThread(object):
                     self.flag_lock.release()
                     break
                 elif self.stress_test:
-                    self.loop_count += self.loop_count
+                    # self.loop_count += self.loop_count
                     self.restart_multidecoder()
                     pass
-        print(self.get_exit_flag())
+
         with open('process{}_results.json'.format(self.process_id), 'w') as jf:
             json.dump(self.results_list, jf, indent=4, ensure_ascii=False)
 
