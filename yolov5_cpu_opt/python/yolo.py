@@ -116,7 +116,7 @@ class MultiDecoderThread(object):
             dete_threshold (float): yolov5 detect_threshold
             nms_threshold (float): yolov5 nms_threshold
         """
-        self.handle = sail.Handle(0)
+        self.handle = sail.Handle(self.tpu_id)
         self.bmcv = sail.Bmcv(self.handle)
         self.batch_size  = batch_size
 
@@ -172,11 +172,11 @@ class MultiDecoderThread(object):
                 bmimg = sail.BMImage()
                 ret = decoder.read(self.handle, bmimg)  
                 while(PreProcessAndInference.PushImage(self.process_id,image_index, bmimg) != 0):
-                    print("Porcess[{}]:[{}/{}]PreProcessAndInference Thread Full, sleep: 10ms!".format(
+                    print("TPUID{} Porcess[{}]:[{}/{}]PreProcessAndInference Thread Full, sleep: 10ms!".format(self.tpu_id,
                         self.process_id,image_index,len(image_name_list)))
                     # time.sleep(0.01)
             using_time = time.time()-time_start
-            logging.info("img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(
+            logging.info("TPUID{}img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(self.tpu_id,
                 using_time,using_time/len(image_name_list)*1000))
             # self.flag_lock.acquire()
             # self.exit_flag = True
@@ -191,11 +191,11 @@ class MultiDecoderThread(object):
                     bmimg = sail.BMImage()
                     ret = decoder.read(self.handle, bmimg)  
                     while(PreProcessAndInference.PushImage(self.process_id,image_index, bmimg) != 0):
-                        print("Porcess[{}]:[{}/{}]PreProcessAndInference Thread Full, sleep: 10ms!".format(
+                        print("TPUID{} Porcess[{}]:[{}/{}]PreProcessAndInference Thread Full, sleep: 10ms!".format(self.tpu_id,
                             self.process_id,image_index,len(image_name_list)))
                         time.sleep(0.01)
                 using_time = time.time()-time_start
-                logging.info("img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(
+                logging.info("TPUID{} img_decoder_and_pushdata thread exit, time use: {:.2f}s,avg: {:.2f}ms".format(self.tpu_id,
                     using_time,using_time/len(image_name_list)*1000))
                 logging.info("restart")
 
@@ -266,10 +266,10 @@ class MultiDecoderThread(object):
 
             ret = self.yolov5_post_async.push_data(channel_list, imageidx_list, output_tensor_map, dete_thresholds, nms_thresholds, width_list, height_list, padding_atrr)
             if ret == 0:
-                logging.debug("yolov5_post_async.push_data ,time use:{:.2f}s".format(time.time()-start_time))
+                logging.debug("TPUID{} yolov5_post_async.push_data ,time use:{:.2f}s".format(self.tpu_id,time.time()-start_time))
 
             else:
-                logging.error("push_data failed, ret: {}".format(ret))
+                logging.error("TPUID{} push_data failed, ret: {}".format(self.tpu_id,ret))
             
 
         logging.info("post_process thread exit!")
@@ -286,7 +286,7 @@ class MultiDecoderThread(object):
         yolo_res_list = []
         draw_flag = False
         total_img = 0
-        logging.info("porcess {} save_res_and_draw start".format(self.process_id))
+        logging.info("TPUID{} porcess {} save_res_and_draw start".format(self.tpu_id,self.process_id))
         while True:
             objs, channel, image_idx = self.yolov5_post_async.get_result_npy() 
             # save result
@@ -343,14 +343,14 @@ class MultiDecoderThread(object):
                 time_use = (end_time-start_time)*1000
                 avg_time = time_use/total_img
 
-                print("Process {}:Total images: {} ms".format(self.process_id, self.loop_count))
+                print("TPUID{} Process {}:Total images: {} ms".format(self.tpu_id,self.process_id, self.loop_count))
                 print("Total time use: {} ms".format(time_use))
                 print("Avg time use: {} ms".format(avg_time))
                 print("Process {}: {} FPS".format(self.process_id, 1000/avg_time))
                 print("save_res_and_draw thread exit!")
 
-                logging.info("Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
-                print("Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
+                logging.info("TPUID{} Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.tpu_id,self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
+                print("TPUID{} Process {}:Loops{},Total time use: {} ms, avg_time{}, {} FPS".format(self.tpu_id,self.process_id, self.loop_count,time_use,avg_time,1000/avg_time))
 
                 if not self.stress_test:
                     self.flag_lock.acquire()
@@ -362,7 +362,7 @@ class MultiDecoderThread(object):
                     self.restart_multidecoder()
                     pass
 
-        with open('process{}_results.json'.format(self.process_id), 'w') as jf:
+        with open('TPUID{} process{}_results.json'.format(self.tpu_id,self.process_id), 'w') as jf:
             json.dump(self.results_list, jf, indent=4, ensure_ascii=False)
 
 
@@ -384,9 +384,9 @@ def argsparser():
     parser.add_argument('--batch_size', type=int, default=4, help='video_nums/batch_size is procress nums of process and postprocess')
     parser.add_argument('--loops', type=int, default=1000, help='total procress video or img nums')
 
-    parser.add_argument('--yolo_bmodel', type=str, default='../models/yolov5s/BM1684X/yolov5s_v6.1_3output_int8_4b.bmodel', help='path of bmodel')
+    parser.add_argument('--yolo_bmodel', type=str, default='../models/yolov5s/BM1684/yolov5s_v6.1_3output_int8_4b.bmodel', help='path of bmodel')
 
-    parser.add_argument('--dev_id_list', type=list, default=[0], help='tpu id list')
+    parser.add_argument('--dev_id_list', nargs='+', default=[0], help='tpu id list')
     parser.add_argument('--draw_images', type=bool, default=False, help='draw images or not')
     parser.add_argument('--stress_test', type=bool, default=False, help='stress test or not')
     args = parser.parse_args()
@@ -416,6 +416,9 @@ if __name__ == '__main__':
     
     decode_yolo_processes = []
     for dev_id in args.dev_id_list:
+        print("111")
+        print(dev_id)
+        dev_id = int(dev_id)
         decode_yolo_processes += [Process(target=process_demo,args=(args.draw_images,args.stress_test,dev_id, \
                                                                max_que_size, input_type, input_, args.yolo_bmodel,args.batch_size, \
                                                                 loop_count, i,dete_threshold,nms_threshold)) for i in range(process_nums) ]
