@@ -115,7 +115,7 @@ class ImgDecoderThread(object):
         start_time = time.time()
         time_use = 0
         results_list = []
-        for i in range(int(loop_count/self.batch_size)):
+        for i in range(loop_count):
 
             start_time = time.time()
             output_tensor_map, ost_images, channel_list ,imageidx_list, padding_atrr = self.engine_image_pre_process.GetBatchData(False)
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     parse.add_argument('--draw_images', type=bool, default=False, help='draw images or not') 
     parse.add_argument('--stress_test', type=bool, default=False, help='stress test or not')
     parse.add_argument('--max_que_size', type=int,default=16, help='max_que_size')  
-    parse.add_argument('--dete_threshold', type=float, default=0.01, help='dete_threshold')
+    parse.add_argument('--dete_threshold', type=float, default=0.001, help='dete_threshold')
     parse.add_argument('--nms_threshold', type=float, default=0.6, help='nms_threshold')
     
 
