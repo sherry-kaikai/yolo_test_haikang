@@ -376,15 +376,15 @@ def process_demo(draw_images,stress_test,tpu_id, max_que_size, input_type, input
 def argsparser():
     parser = argparse.ArgumentParser(prog=__file__)
     parser.add_argument('--max_que_size', type=int, default=16, help='multidecode queue')
-    parser.add_argument('--dete_threshold', type=int, default=0.01, help='dete_threshold')
-    parser.add_argument('--nms_threshold', type=int, default=0.6, help='nms_threshold')
+    parser.add_argument('--dete_threshold', type=float, default=0.01, help='dete_threshold')
+    parser.add_argument('--nms_threshold', type=float, default=0.6, help='nms_threshold')
     parser.add_argument('--input', type=str, default='../datasets/coco128', help='path of input, image_dir or video path') 
     
     parser.add_argument('--video_nums', type=int, default=16, help='simulate process multi video paths')
     parser.add_argument('--batch_size', type=int, default=4, help='video_nums/batch_size is procress nums of process and postprocess')
     parser.add_argument('--loops', type=int, default=1000, help='total procress video or img nums')
 
-    parser.add_argument('--yolo_bmodel', type=str, default='../models/yolov5s/BM1684/yolov5s_v6.1_3output_int8_4b.bmodel', help='path of bmodel')
+    parser.add_argument('--yolo_bmodel', type=str, default='../models/yolov5s/BM1684X/yolov5s_v6.1_3output_int8_4b.bmodel', help='path of bmodel')
 
     parser.add_argument('--dev_id_list', nargs='+', default=[0], help='tpu id list')
     parser.add_argument('--draw_images', type=bool, default=False, help='draw images or not')
